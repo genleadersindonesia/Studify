@@ -249,6 +249,10 @@ details.faq p{margin:8px 0 0;color:var(--muted)}
 .legal{color:var(--muted);font-size:12.5px;margin-top:22px;text-align:center}
 .drop{border:2px dashed var(--border);border-radius:14px;padding:18px;text-align:center;color:var(--muted);cursor:pointer;display:block}
 .drop.over{border-color:var(--primary);color:var(--primary)}
+.sw{width:30px;height:30px;border-radius:50%;border:3px solid transparent;padding:0}
+.sw.on{border-color:var(--text)}
+.card.add{border-style:dashed;display:grid;place-items:center;text-align:center;min-height:130px;background:transparent}
+.tagc{display:inline-block;font-size:11px;font-weight:700;background:rgba(255,255,255,.25);border-radius:99px;padding:1px 9px;margin-bottom:4px}
 </style>
 </head>
 <body class="landing">
@@ -295,7 +299,7 @@ function confirmModal(msg, fn) { window._cf = () => { closeModal(); fn(); }; mod
 
 /* ================= State ================= */
 const KEY = 'studify:v2';
-const defaults = () => ({ name: '', track: '', xp: 0, streak: 0, lastDay: '', theme: '', notes: [], decks: [], quizzes: [], tasks: [], done: {}, scores: {}, m: null, focusDone: 0, gpa: [], badges: {}, last: null, seeded: false, quizDone: 0 });
+const defaults = () => ({ name: '', track: '', xp: 0, streak: 0, lastDay: '', theme: '', notes: [], decks: [], quizzes: [], tasks: [], done: {}, scores: {}, m: null, focusDone: 0, gpa: [], badges: {}, last: null, seeded: false, quizDone: 0, courses: [] });
 let S = defaults();
 try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(defaults(), JSON.parse(raw)); } catch (e) {}
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
@@ -418,15 +422,18 @@ const COURSES = [
     { q: 'Fungsi utama if adalah …', o: ['Mengulang kode', 'Memilih aksi berdasarkan kondisi', 'Menyimpan data', 'Menampilkan gambar'], a: 1, e: 'if menjalankan kode hanya bila kondisi terpenuhi.' },
     { q: 'Loop tak berhingga biasanya terjadi karena …', o: ['Variabel bertipe string', 'Kondisi berhenti tidak pernah terpenuhi', 'Kode terlalu pendek', 'Komentar terlalu banyak'], a: 1, e: 'Loop berjalan terus jika syarat berhentinya tak pernah tercapai.' }] }] }
 ];
-const allLessons = () => COURSES.flatMap(c => c.ls.map(l => ({ c, l })));
+const ALLC = () => COURSES.concat(S.courses || []);
+const allLessons = () => ALLC().flatMap(c => c.ls.map(l => ({ c, l })));
 const doneCount = c => c.ls.filter(l => S.done[l.id]).length;
+const cp = c => c.ls.length ? doneCount(c) / c.ls.length * 100 : 0;
+const qCount = c => c.ls.reduce((a, l) => a + l.q.length, 0);
+const courseName = id => { const c = ALLC().find(x => x.id === id); return c ? c.name : 'Kelas'; };
 
 /* ================= Landing ================= */
 function scrollToSec(id) { const e = document.getElementById(id); if (e) e.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 function vLanding() {
   const feats = [['🎓', 'Kelas interaktif', 'Materi singkat, latihan soal instan, dan lencana progres seperti di kelas online.', 'kelas'], ['📝', 'Catatan ala Notion', 'Editor blok: judul, daftar, to-do, kutipan, kode. Ketik "/" untuk memilih blok.', 'notes'], ['🃏', 'Flashcard', 'Buat deck sendiri dan hafalkan dengan sistem ulang bertahap.', 'flash'], ['🧠', 'Kuis buatan sendiri', 'Susun soal pilihan ganda untuk latihan bersama teman.', 'kuis'], ['🎮', 'Game cocokkan', 'Pasangkan pertanyaan dan jawaban dari kartumu.', 'game'], ['✅', 'Planner tugas', 'Catat tugas dan tenggat, lihat jadwal seminggu ke depan.', 'planner'], ['⏱️', 'Mode fokus', 'Pomodoro dengan hitungan sesi dan XP.', 'fokus'], ['🧮', 'Kalkulator IPK', 'Hitung IPS/IPK otomatis dengan skala 4.0.', 'ipk']];
   $('#view').innerHTML = `
-  <span class="announce" onclick="go('notes')">✍️ Baru: editor catatan berbasis blok, seperti Notion →</span>
   <section class="lhero"><img class="mascot" src="${LOGO}" alt="Maskot Studify"><h1>Satu tempat untuk <span class="hl">belajar, mencatat, dan latihan</span></h1>
     <p>Kelas singkat, catatan rapi, flashcard, kuis, dan planner. Semua dalam satu platform yang simpel dan bisa dipakai tanpa daftar.</p>
     <div class="row" style="justify-content:center"><button class="btn dark lg" onclick="startApp()">Mulai Belajar Sekarang</button><button class="btn ghost lg" onclick="scrollToSec('fitur')">Lihat fitur</button></div></section>
@@ -468,7 +475,7 @@ function vHome() {
   <div class="sect"><h3>🎯 Misi harian</h3></div>
   <div class="card">${MISI.map(([k, n, e, t]) => { const v = Math.min(m[k] || 0, n); return `<div class="row" style="margin:7px 0"><span>${v >= n ? '✅' : e}</span><span class="grow">${t}</span><span class="note">${v}/${n}</span></div>`; }).join('')}<div class="note" style="margin-top:6px">Tiap misi selesai memberi +10 XP. Reset setiap hari.</div></div>
   <div class="sect"><h3>🎓 Kelasmu</h3><a onclick="go('kelas')">Lihat semua</a></div>
-  <div class="hscroll">${COURSES.map(c => `<div class="subj" style="background:${c.color}" onclick="go('kelas',{s:'${c.id}'})"><div class="em">${c.emoji}</div><h3>${c.name}</h3><small>${doneCount(c)}/${c.ls.length} materi</small><div class="bar2"><i style="width:${doneCount(c) / c.ls.length * 100}%"></i></div></div>`).join('')}</div>
+  <div class="hscroll">${ALLC().map(c => `<div class="subj" style="background:${c.color}" onclick="go('kelas',{s:'${c.id}'})"><div class="em">${c.emoji}</div><h3>${c.name}</h3><small>${doneCount(c)}/${c.ls.length} materi</small><div class="bar2"><i style="width:${cp(c)}%"></i></div></div>`).join('')}</div>
   <div class="grid g2" style="margin-top:8px"><div><div class="sect"><h3>📝 Halaman terbaru</h3><a onclick="go('notes')">Semua</a></div>
     ${notes.map(n => `<div class="item click" onclick="go('notes',{n:'${n.id}'})"><div class="ico">${n.icon}</div><div class="grow"><b>${esc(n.title || 'Tanpa judul')}</b><br><small>${new Date(n.updated).toLocaleDateString('id-ID')}</small></div></div>`).join('') || '<div class="note">Belum ada catatan.</div>'}</div>
     <div><div class="sect"><h3>✅ Tugas hari ini</h3><a onclick="go('planner')">Planner</a></div>
@@ -479,16 +486,24 @@ function vHome() {
 /* ================= Kelas ================= */
 function vKelas() {
   if (!param) {
-    $('#view').innerHTML = `<h2>🎓 Kelas</h2><p class="sub">Pilih mata pelajaran, baca materi singkat, lalu kerjakan latihan soalnya.</p>
-    <div class="grid g2">${COURSES.map(c => `<div class="subj" style="background:${c.color}" onclick="go('kelas',{s:'${c.id}'})"><div class="em">${c.emoji}</div><h3>${c.name}</h3><small>${c.desc}</small><div class="bar2"><i style="width:${doneCount(c) / c.ls.length * 100}%"></i></div><small>${doneCount(c)}/${c.ls.length} materi selesai</small></div>`).join('')}</div>`;
+    $('#view').innerHTML = `<div class="row"><h2 style="margin:0">🎓 Kelas</h2><div class="grow"></div><button class="btn" onclick="courseModal()">＋ Tambah kelas</button></div>
+    <p class="sub">Pilih kelas, baca materi singkat, lalu kerjakan latihan soalnya. Kamu juga bisa membuat kelas dan tryout sendiri dari file PPT atau PDF.</p>
+    <div class="grid g2">${ALLC().map(c => `<div class="subj" style="background:${c.color}" onclick="go('kelas',{s:'${c.id}'})">${c.custom ? '<span class="tagc">📂 Kelasku</span><br>' : ''}<div class="em">${c.emoji}</div><h3>${esc(c.name)}</h3><small>${esc(c.desc)}</small><div class="bar2"><i style="width:${cp(c)}%"></i></div><small>${doneCount(c)}/${c.ls.length} materi selesai</small></div>`).join('')}
+    <div class="card hover add" onclick="courseModal()"><div><div style="font-size:32px">＋</div><b>Tambah kelas</b><div class="note">Dari PPT, PDF, atau mulai kosong</div></div></div></div>`;
     return;
   }
-  const c = COURSES.find(x => x.id === param.s); if (!c) return go('kelas');
+  const c = ALLC().find(x => x.id === param.s); if (!c) return go('kelas');
   if (!param.l) {
-    $('#view').innerHTML = `<div class="crumb"><a onclick="go('kelas')">Kelas</a> › ${c.name}</div>
-    <div class="banner" style="background:${c.color}"><div style="font-size:40px">${c.emoji}</div><h2>${c.name}</h2><div>${c.desc}</div><div class="bar2" style="margin-top:12px;background:rgba(255,255,255,.3)"><i style="width:${doneCount(c) / c.ls.length * 100}%;background:#fff"></i></div></div>
-    ${c.ls.map((l, i) => `<div class="item click" onclick="go('kelas',{s:'${c.id}',l:'${l.id}'})"><div class="ico">${S.done[l.id] ? '✅' : i + 1}</div><div class="grow"><b>${esc(l.t)}</b><br><small>⏱ ${l.m} menit · ${l.q.length} soal${S.scores[l.id] != null ? ' · skor terbaik ' + S.scores[l.id] + '%' : ''}</small></div><span>›</span></div>`).join('')}
-    <div class="row" style="margin-top:14px"><button class="btn" onclick="tryout('${c.id}')">🏁 Mini Tryout ${c.name} (${c.ls.length * 3} soal)</button></div>`;
+    const tq = S.quizzes.filter(q => q.cid === c.id), nq = qCount(c);
+    $('#view').innerHTML = `<div class="crumb"><a onclick="go('kelas')">Kelas</a> › ${esc(c.name)}</div>
+    <div class="banner" style="background:${c.color}"><div style="font-size:40px">${c.emoji}</div><h2>${esc(c.name)}</h2><div>${esc(c.desc)}</div><div class="bar2" style="margin-top:12px;background:rgba(255,255,255,.3)"><i style="width:${cp(c)}%;background:#fff"></i></div></div>
+    ${c.ls.map((l, i) => `<div class="item click" onclick="go('kelas',{s:'${c.id}',l:'${l.id}'})"><div class="ico">${S.done[l.id] ? '✅' : i + 1}</div><div class="grow"><b>${esc(l.t)}</b><br><small>⏱ ${l.m} menit · ${l.q.length} soal${S.scores[l.id] != null ? ' · skor terbaik ' + S.scores[l.id] + '%' : ''}</small></div><span>›</span></div>`).join('') || '<div class="empty"><div class="em">📭</div>Kelas ini belum punya materi.</div>'}
+    ${c.custom ? `<div class="row" style="margin:6px 0 4px"><button class="btn ghost" onclick="lessonModal('${c.id}')">＋ Tambah materi</button></div>` : ''}
+    <div class="sect"><h3>🏁 Tryout</h3><a onclick="tryoutModal('${c.id}')">＋ Tambah tryout</a></div>
+    ${nq ? `<div class="item"><div class="ico">🏁</div><div class="grow"><b>Mini Tryout ${esc(c.name)}</b><br><small>${nq} soal dari semua materi${S.scores['try-' + c.id] != null ? ' · skor terbaik ' + S.scores['try-' + c.id] + '%' : ''}</small></div><button class="btn sm" onclick="tryout('${c.id}')">Mulai</button></div>` : ''}
+    ${tq.map(q => `<div class="item"><div class="ico">📋</div><div class="grow"><b>${esc(q.name)}</b><br><small>${q.qs.length} soal${S.scores['u-' + q.id] != null ? ' · skor terbaik ' + S.scores['u-' + q.id] + '%' : ''}</small></div><button class="btn sm" ${q.qs.length ? '' : 'disabled'} onclick="playQuiz('${q.id}')">Mulai</button><button class="btn ghost sm" onclick="go('kuis',{q:'${q.id}'})">Kelola</button></div>`).join('')}
+    ${!nq && !tq.length ? '<div class="note">Belum ada tryout. Tambahkan dari file PPT/PDF, dari materi kelas, atau tulis soal sendiri.</div>' : ''}
+    ${c.custom ? `<div class="row" style="margin-top:22px"><button class="btn ghost sm" onclick="delCourse('${c.id}')">🗑️ Hapus kelas ini</button></div>` : ''}`;
     return;
   }
   const l = c.ls.find(x => x.id === param.l); if (!l) return go('kelas', { s: c.id });
@@ -497,14 +512,14 @@ function vKelas() {
   const ans = lessonAns[l.id] || (lessonAns[l.id] = {}); const answered = Object.keys(ans).length;
   const score = l.q.filter((q, i) => ans[i] === q.a).length;
   const body = l.b.map(([t, x]) => t === 'h' ? `<h3>${esc(x)}</h3>` : t === 'p' ? `<p>${esc(x)}</p>` : t === 'ul' ? `<ul>${x.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : `<div class="callbox">${esc(x)}</div>`).join('');
-  $('#view').innerHTML = `<div class="crumb"><a onclick="go('kelas')">Kelas</a> › <a onclick="go('kelas',{s:'${c.id}'})">${c.name}</a> › ${esc(l.t)}</div>
-  <div class="banner" style="background:${c.color}"><div>${c.emoji} ${c.name}</div><h2>${esc(l.t)}</h2><div>⏱ ${l.m} menit · ⭐ +20 XP saat selesai</div></div>
+  $('#view').innerHTML = `<div class="crumb"><a onclick="go('kelas')">Kelas</a> › <a onclick="go('kelas',{s:'${c.id}'})">${esc(c.name)}</a> › ${esc(l.t)}</div>
+  <div class="banner" style="background:${c.color}"><div>${c.emoji} ${esc(c.name)}</div><h2>${esc(l.t)}</h2><div>⏱ ${l.m} menit · ⭐ +20 XP saat selesai</div></div>
   <div class="card lbody">${body}</div>
-  <div class="sect"><h3>✍️ Latihan soal</h3><span class="note">${answered}/${l.q.length} dijawab</span></div>
+  ${l.q.length ? `<div class="sect"><h3>✍️ Latihan soal</h3><span class="note">${answered}/${l.q.length} dijawab</span></div>
   ${l.q.map((q, qi) => `<div class="qcard"><b>${qi + 1}. ${esc(q.q)}</b>${q.o.map((o, k) => `<button class="opt ${ans[qi] != null ? (k === q.a ? 'ok' : k === ans[qi] ? 'no' : '') : ''}" ${ans[qi] != null ? 'disabled' : ''} onclick="lessonPick('${l.id}',${qi},${k})">${'ABCD'[k]}. ${esc(o)}</button>`).join('')}${ans[qi] != null ? `<div class="tip">${ans[qi] === q.a ? '✅ Benar! ' : '❌ Belum tepat. '}${esc(q.e)}</div>` : ''}</div>`).join('')}
-  ${answered === l.q.length ? `<div class="card" style="text-align:center;margin-bottom:12px"><b style="font-size:20px">Skor: ${score}/${l.q.length}</b> <button class="btn ghost sm" onclick="lessonAns['${l.id}']={};vKelas()">Ulangi latihan</button></div>` : ''}
+  ${answered === l.q.length ? `<div class="card" style="text-align:center;margin-bottom:12px"><b style="font-size:20px">Skor: ${score}/${l.q.length}</b> <button class="btn ghost sm" onclick="lessonAns['${l.id}']={};vKelas()">Ulangi latihan</button></div>` : ''}` : ''}
   <div class="row" style="margin-top:10px"><button class="btn ${S.done[l.id] ? 'ghost' : 'good'}" onclick="finishLesson('${c.id}','${l.id}')">${S.done[l.id] ? '✅ Sudah selesai' : '✅ Tandai selesai'}</button>
-    <button class="btn ghost" onclick="lessonToNote('${c.id}','${l.id}')">💾 Simpan ke Catatan</button><button class="btn ghost" onclick="lessonToCards('${c.id}','${l.id}')">🃏 Jadikan flashcard</button></div>
+    <button class="btn ghost" onclick="lessonToNote('${c.id}','${l.id}')">💾 Simpan ke Catatan</button>${l.q.length ? `<button class="btn ghost" onclick="lessonToCards('${c.id}','${l.id}')">🃏 Jadikan flashcard</button>` : ''}${c.custom ? `<button class="btn ghost" onclick="delLesson('${c.id}','${l.id}')">🗑️ Hapus materi</button>` : ''}</div>
   <div class="row" style="justify-content:space-between;margin-top:18px">${prev ? `<button class="btn ghost" onclick="go('kelas',{s:'${c.id}',l:'${prev.id}'})">← ${esc(cut(prev.t, 22))}</button>` : '<span></span>'}${next ? `<button class="btn" onclick="go('kelas',{s:'${c.id}',l:'${next.id}'})">${esc(cut(next.t, 22))} →</button>` : ''}</div>`;
 }
 const lessonAns = {};
@@ -524,7 +539,319 @@ function lessonToCards(cid, lid) {
   let n = 0; f.l.q.forEach(q => { const a = q.o[q.a] + ' — ' + q.e; if (!d.cards.some(c => c.q === q.q)) { d.cards.push({ id: uid(), q: q.q, a, box: 0 }); n++; } });
   save(); toast(n ? `${n} kartu ditambahkan ke "${d.name}"` : 'Kartu dari soal ini sudah ada.');
 }
-function tryout(cid) { const c = COURSES.find(x => x.id === cid); startRun('Mini Tryout ' + c.name, c.ls.flatMap(l => l.q), 'try-' + cid, () => go('kelas', { s: cid })); }
+function tryout(cid) {
+  const c = ALLC().find(x => x.id === cid); if (!c) return;
+  const qs = c.ls.flatMap(l => l.q);
+  if (!qs.length) return toast('Kelas ini belum punya soal. Tambahkan tryout atau soal dulu.');
+  startRun('Mini Tryout ' + c.name, qs, 'try-' + cid, () => go('kelas', { s: cid }));
+}
+
+/* ================= Kelas & tryout buatan sendiri ================= */
+const C_EMO = ['📘', '📗', '📙', '📕', '🧪', '💻', '⚖️', '📊', '🌍', '🎨', '🧠', '🏛️'];
+const C_COL = ['#5b4bf5', '#f97316', '#16a34a', '#2563eb', '#e11d48', '#0891b2', '#ca8a04', '#db2777'];
+const ACCEPT = '.pptx,.pdf,.txt,.md';
+function pickOn(btn) { [...btn.parentNode.children].forEach(b => b.classList.remove('on')); btn.classList.add('on'); }
+const fileOf = id => { const e = document.getElementById(id); return e && e.files && e.files[0] ? e.files[0] : null; };
+const GRP_OPTS = '<option value="0">Otomatis (disarankan)</option><option value="1">Tiap 1 slide / halaman</option><option value="2">Tiap 2</option><option value="3">Tiap 3</option><option value="5">Tiap 5</option><option value="8">Tiap 8</option>';
+
+/* ---- pembaca file ---- */
+let _pdfP = null;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve();
+  if (_pdfP) return _pdfP;
+  const base = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  _pdfP = new Promise((res, rej) => {
+    const sc = document.createElement('script'); sc.src = base + 'pdf.min.js';
+    sc.onload = async () => {
+      try {
+        const r = await fetch(base + 'pdf.worker.min.js'); const t = await r.text();
+        pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(new Blob([t], { type: 'text/javascript' }));
+        res();
+      } catch (e) { rej(new Error('pdflib')); }
+    };
+    sc.onerror = () => rej(new Error('pdflib'));
+    document.head.appendChild(sc);
+  }).catch(e => { _pdfP = null; throw e; });
+  return _pdfP;
+}
+function mergeLines(lines) {
+  const out = [];
+  lines.forEach(l => {
+    const prev = out[out.length - 1];
+    if (prev && prev.length > 55 && !/[.:;!?]$/.test(prev) && /^[a-z(]/.test(l) && !/^([-•●▪*]|\d+[.)])\s/.test(l)) out[out.length - 1] = prev + ' ' + l;
+    else out.push(l);
+  });
+  return out;
+}
+async function readPdf(file) {
+  await loadPdfJs();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const tc = await (await pdf.getPage(i)).getTextContent();
+    const its = tc.items.filter(t => t.str && t.str.trim()).map(t => ({ s: t.str, x: t.transform[4], y: t.transform[5] }));
+    its.sort((a, b) => b.y - a.y || a.x - b.x);
+    const rows = [];
+    its.forEach(t => { const r = rows[rows.length - 1]; if (r && Math.abs(r.y - t.y) <= 3) r.p.push(t); else rows.push({ y: t.y, p: [t] }); });
+    const txt = rows.map(r => r.p.sort((a, b) => a.x - b.x).map(t => t.s).join(' ').replace(/\s+/g, ' ').trim()).filter(x => x && !/^\d{1,3}$/.test(x));
+    const paras = mergeLines(txt); if (paras.length) pages.push(paras);
+  }
+  if (!pages.length) throw new Error('scan');
+  return pages;
+}
+function textSections(t) {
+  const secs = []; let cur = null, heads = 0;
+  t.split(/\r?\n/).forEach(raw => {
+    const l = raw.trim(); if (!l) return; let m;
+    if ((m = l.match(/^#{1,3}\s+(.*)/))) { heads++; cur = [m[1].trim()]; secs.push(cur); return; }
+    const x = l.replace(/^>\s?/, '').replace(/^([-*•]|\d+[.)])\s+/, '').trim(); if (!x) return;
+    if (!cur) { cur = []; secs.push(cur); } cur.push(x);
+  });
+  if (!heads) { const all = secs.flat(), out = []; for (let i = 0; i < all.length; i += 8) out.push(all.slice(i, i + 8)); return out; }
+  return secs;
+}
+async function readSource(f) {
+  const n = f.name.toLowerCase();
+  if (/\.pptx$/.test(n)) { const s = await readPptx(f); if (!s.length) throw new Error('empty'); return { kind: 'slide', secs: s }; }
+  if (/\.pdf$/.test(n)) return { kind: 'page', secs: await readPdf(f) };
+  if (/\.(txt|md)$/.test(n)) { const s = textSections(await f.text()); if (!s.length) throw new Error('empty'); return { kind: 'text', secs: s }; }
+  throw new Error('format');
+}
+function failRead(e) {
+  console.error(e);
+  const m = { format: 'Format belum didukung. Pakai .pptx, .pdf, .txt, atau .md (bukan .ppt lama).', scan: 'PDF ini tampaknya hasil scan/gambar tanpa teks, jadi belum bisa dibaca.', pdflib: 'Pembaca PDF gagal dimuat. Periksa koneksi internet, lalu coba lagi.', empty: 'Tidak ada teks yang bisa dibaca dari file ini.' }[e && e.message];
+  toast(m || 'Gagal membaca file. Coba file lain.');
+}
+
+/* ---- materi dari teks ---- */
+const BUL = /^[•●▪▫◦‣∙·*-]\s+/;
+const isHead = s => s.length <= 80 && !/[.!?;,]$/.test(s) && s.split(/\s+/).length <= 12;
+function makeLesson(group, kind, a, b) {
+  const first = group[0][0] || '', fromFirst = isHead(first);
+  let t = fromFirst ? first.replace(/^\d+[.)]\s+/, '') : kind === 'slide' ? `Slide ${a}${b > a ? '–' + b : ''}` : kind === 'page' ? `Halaman ${a}${b > a ? '–' + b : ''}` : `Materi ${a}`;
+  t = cut(t.replace(BUL, ''), 70);
+  const blocks = [], paras = []; let ul = null;
+  const flush = () => { if (ul) { blocks.push(['ul', ul]); ul = null; } };
+  group.forEach((sec, si) => {
+    sec.forEach((raw, pi) => {
+      const isB = BUL.test(raw), x = raw.replace(BUL, '').trim(); if (!x) return;
+      paras.push(x);
+      if (si === 0 && pi === 0 && fromFirst) return;
+      if (pi === 0 && !isB && isHead(x) && sec.length > 1) { flush(); blocks.push(['h', x]); return; }
+      if (isB || (x.length <= 130 && !/[.!?]$/.test(x))) (ul = ul || []).push(x);
+      else { flush(); blocks.push(['p', x]); }
+    });
+    flush();
+  });
+  if (!blocks.length) blocks.push(['p', first || t]);
+  const words = paras.join(' ').split(/\s+/).length;
+  return { id: 'l_' + uid(), t, m: Math.max(2, Math.round(words / 140)), b: blocks, q: [], _p: paras };
+}
+function buildLessons(src, grp) {
+  const secs = src.secs.filter(s => s.length), size = grp || ({ slide: 4, page: 3, text: 1 }[src.kind] || 3), ls = [];
+  for (let i = 0; i < secs.length; i += size) ls.push(makeLesson(secs.slice(i, i + size), src.kind, i + 1, Math.min(i + size, secs.length)));
+  const seen = {}; ls.forEach(l => { const k = l.t.toLowerCase(); seen[k] = (seen[k] || 0) + 1; if (seen[k] > 1) l.t = cut(l.t, 64) + ' (' + seen[k] + ')'; });
+  return ls;
+}
+const lessonParas = l => l.b.flatMap(([t, x]) => t === 'ul' ? x : [x]);
+
+/* ---- pembuat soal otomatis (berbasis pola kalimat, tanpa internet) ---- */
+const STOP = new Set('yang dengan untuk dalam pada adalah dari atau juga dapat akan oleh sebagai karena sehingga tetapi serta bahwa suatu setiap antara terhadap merupakan melalui sebuah dimana lebih sangat hanya sudah telah masih saat ketika setelah sebelum tidak bukan mereka kami kita agar bagi jika maka seperti secara tersebut berbagai beberapa semua dapat harus bahkan namun yaitu yakni'.split(' '));
+const BADT = /^(hal|ini|itu|yang|ia|dia|mereka|kita|kami|ada|tersebut|dalam|pada|untuk|dengan|jika|karena|sehingga|oleh|bahwa|dan|atau|serta|contoh|catatan|note|tips|langkah|definisi|rumus|keterangan|kesimpulan|tujuan|manfaat|sumber)\b/i;
+const sents = p => p.split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+function pickFacts(paras) {
+  const out = [], seen = new Set();
+  const add = (term, def, verb) => {
+    term = term.replace(/^[\d.)\s•\-–]+/, '').replace(/["“”]/g, '').trim(); def = def.replace(/[.;\s]+$/, '').trim();
+    const k = term.toLowerCase();
+    if (term.length < 3 || def.length < 12 || seen.has(k) || BADT.test(term) || term.split(/\s+/).length > 7) return;
+    seen.add(k); out.push({ t: term, d: def, v: verb });
+  };
+  paras.forEach(p => sents(p).forEach(s => {
+    const z = s.replace(/[.]+$/, ''); let m;
+    if ((m = z.match(/^(.{3,70}?)\s+(adalah|merupakan|ialah|berarti)\s+(.{12,260})$/i))) return add(m[1], m[3], m[2].toLowerCase());
+    if ((m = z.match(/^([^:]{2,50}):\s*(.{12,260})$/))) return add(m[1], m[2], 'yaitu');
+    if ((m = z.match(/^(.{2,50}?)\s[-–—]\s(.{15,260})$/))) return add(m[1], m[2], 'yaitu');
+  }));
+  return out;
+}
+function makePool(paras) {
+  const words = new Set();
+  paras.forEach(p => (p.match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ-]{5,}/g) || []).forEach(w => { if (!STOP.has(w.toLowerCase())) words.add(w); }));
+  return { facts: pickFacts(paras), words: [...words] };
+}
+function genQuestions(paras, pool, n) {
+  const F = [], C = [];
+  shuffle(pickFacts(paras)).forEach((f, i) => {
+    const others = shuffle(pool.facts.filter(x => x.t.toLowerCase() !== f.t.toLowerCase()));
+    const ex = `${f.t} ${f.v} ${f.d}.`;
+    if (i % 2 === 0) {
+      const ans = cut(f.d, 130), ds = [];
+      others.forEach(o => { const d = cut(o.d, 130); if (ds.length < 3 && d !== ans && !ds.includes(d)) ds.push(d); });
+      if (ds.length < 2) return;
+      const o = shuffle([ans, ...ds]); F.push({ q: `Apa yang dimaksud dengan “${f.t}”?`, o, a: o.indexOf(ans), e: ex });
+    } else {
+      const ts = []; others.forEach(o => { if (ts.length < 3 && !ts.includes(o.t)) ts.push(o.t); });
+      if (ts.length < 2) return;
+      const o = shuffle([f.t, ...ts]); F.push({ q: `Pernyataan “${cut(f.d, 160)}” paling tepat menggambarkan …`, o, a: o.indexOf(f.t), e: ex });
+    }
+  });
+  shuffle(paras.flatMap(sents)).forEach(s => {
+    if (s.length < 45 || s.length > 220 || /[?]$/.test(s)) return;
+    const ws = (s.match(/[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ-]{5,}/g) || []).filter(w => !STOP.has(w.toLowerCase())).sort((a, b) => b.length - a.length);
+    if (!ws.length) return;
+    const w = ws[Math.floor(Math.random() * Math.min(2, ws.length))], cap = /^[A-ZÀ-Þ]/.test(w);
+    const ds = shuffle(pool.words.filter(x => x.toLowerCase() !== w.toLowerCase() && /^[A-ZÀ-Þ]/.test(x) === cap && Math.abs(x.length - w.length) <= 5)).slice(0, 3);
+    if (ds.length < 2) return;
+    const o = shuffle([w, ...ds]), at = s.indexOf(w);
+    C.push({ q: `Lengkapi kalimat: “${s.slice(0, at)}_____${s.slice(at + w.length)}”`, o, a: o.indexOf(w), e: 'Kalimat lengkap: ' + s });
+  });
+  const out = []; let i = 0, j = 0;
+  while (out.length < n && (i < F.length || j < C.length)) { if (i < F.length) out.push(F[i++]); if (out.length < n && j < C.length) out.push(C[j++]); }
+  return out.slice(0, n);
+}
+function genTryout(parts, pool, n) {
+  parts = parts.filter(p => p.length); if (!parts.length) return [];
+  const per = Math.ceil(n / parts.length) + 1, seen = new Set(), all = [];
+  parts.forEach(p => genQuestions(p, pool, per).forEach(q => { if (!seen.has(q.q)) { seen.add(q.q); all.push(q); } }));
+  return shuffle(all).slice(0, n);
+}
+
+/* ---- modal: tambah kelas ---- */
+function courseModal() {
+  window._ce = C_EMO[0]; window._cc = C_COL[0];
+  modal(`<h3>Tambah kelas</h3><p class="sub">Unggah PPT atau PDF, lalu materi dan soal latihan dibuat otomatis dari isinya. Atau mulai dari kelas kosong.</p>
+  <div class="fld"><label>Nama kelas</label><input type="text" id="cName" maxlength="60" placeholder="Mis. Pengantar Manajemen"></div>
+  <div class="fld"><label>Ikon & warna</label><div class="row">${C_EMO.map((e, i) => `<button class="pill ${i ? '' : 'on'}" onclick="_ce='${e}';pickOn(this)">${e}</button>`).join('')}</div>
+  <div class="row" style="margin-top:8px">${C_COL.map((c, i) => `<button class="sw ${i ? '' : 'on'}" style="background:${c}" aria-label="Warna ${i + 1}" onclick="_cc='${c}';pickOn(this)"></button>`).join('')}</div></div>
+  <div class="fld"><label>File materi (opsional)</label><label class="drop">📄 Pilih file .pptx, .pdf, .txt, atau .md<input type="file" id="cFile" accept="${ACCEPT}" hidden></label><div class="note" id="cFn"></div></div>
+  <div class="row" style="flex-wrap:nowrap"><div class="fld grow"><label>Pecah materi</label><select id="cGrp">${GRP_OPTS}</select></div>
+  <div class="fld grow"><label>Soal per materi</label><select id="cQn"><option value="3">3 soal</option><option value="5">5 soal</option><option value="0">Tanpa soal otomatis</option></select></div></div>
+  <div class="fld"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" id="cTry" checked style="width:18px;height:18px;accent-color:var(--primary)"> Buat juga 1 tryout (15 soal) dari seluruh isi file</label></div>
+  <button class="btn" id="cGo" onclick="createCourse()">Buat kelas</button>`);
+  $('#cFile').onchange = e => { const f = e.target.files[0]; $('#cFn').textContent = f ? '✔ ' + f.name : ''; if (f && !val('cName').trim()) $('#cName').value = f.name.replace(/\.[^.]+$/, ''); };
+  setTimeout(() => { const i = $('#cName'); if (i) i.focus(); }, 100);
+}
+async function createCourse() {
+  const f = fileOf('cFile'); let name = val('cName').trim();
+  if (!name && !f) return toast('Isi nama kelas atau pilih file.');
+  const btn = $('#cGo'); btn.disabled = true; btn.textContent = 'Memproses…';
+  const c = { id: 'c_' + uid(), name: name || f.name.replace(/\.[^.]+$/, ''), emoji: window._ce, color: window._cc, desc: 'Kelas buatanku', ls: [], custom: true };
+  let tryQs = [];
+  try {
+    if (f) {
+      toast('Membaca file…');
+      const src = await readSource(f), ls = buildLessons(src, +val('cGrp'));
+      if (!ls.length) throw new Error('empty');
+      const pool = makePool(ls.flatMap(l => l._p)), qn = +val('cQn');
+      if ($('#cTry').checked) tryQs = genTryout(ls.map(l => l._p), pool, 15);
+      ls.forEach(l => { l.q = qn ? genQuestions(l._p, pool, qn) : []; delete l._p; });
+      c.ls = ls; c.desc = `Dibuat dari ${f.name}`;
+    }
+  } catch (e) { btn.disabled = false; btn.textContent = 'Buat kelas'; return failRead(e); }
+  S.courses.push(c);
+  if (f && $('#cTry').checked) S.quizzes.push({ id: uid(), name: 'Tryout ' + c.name, qs: tryQs, cid: c.id });
+  save(); closeModal(); addXP(10, 'kelas dibuat'); go('kelas', { s: c.id });
+  const nq = qCount(c);
+  toast(f ? `${c.ls.length} materi · ${nq + tryQs.length} soal dibuat. Cek dan hapus soal yang kurang pas ya.` : 'Kelas dibuat. Tambahkan materi dulu.');
+}
+
+/* ---- modal: tambah materi ke kelas buatan ---- */
+function lessonModal(cid) {
+  modal(`<h3>Tambah materi</h3><p class="sub">Tempel teks materi atau unggah file PPT/PDF.</p>
+  <div class="fld"><label>Judul materi (opsional untuk file)</label><input type="text" id="lTitle" maxlength="70"></div>
+  <div class="fld"><label>Isi materi</label><textarea id="lText" placeholder="Tempel teks di sini. Kalimat seperti &quot;Istilah adalah penjelasan…&quot; akan dijadikan soal."></textarea></div>
+  <div class="fld"><label>…atau file</label><label class="drop">📄 Pilih file .pptx, .pdf, .txt, atau .md<input type="file" id="lFile" accept="${ACCEPT}" hidden></label><div class="note" id="lFn"></div></div>
+  <div class="row" style="flex-wrap:nowrap"><div class="fld grow"><label>Pecah materi</label><select id="lGrp">${GRP_OPTS}</select></div>
+  <div class="fld grow"><label>Soal per materi</label><select id="lQn"><option value="3">3 soal</option><option value="5">5 soal</option><option value="0">Tanpa soal</option></select></div></div>
+  <button class="btn" id="lGo" onclick="addLessons('${cid}')">Tambahkan</button>`);
+  $('#lFile').onchange = e => { const f = e.target.files[0]; $('#lFn').textContent = f ? '✔ ' + f.name : ''; };
+}
+async function addLessons(cid) {
+  const c = S.courses.find(x => x.id === cid); if (!c) return;
+  const f = fileOf('lFile'), text = val('lText').trim(), title = val('lTitle').trim(), qn = +val('lQn');
+  if (!f && !text) return toast('Tempel teks materi atau pilih file.');
+  const btn = $('#lGo'); btn.disabled = true; btn.textContent = 'Memproses…';
+  let ls;
+  try {
+    if (f) { ls = buildLessons(await readSource(f), +val('lGrp')); if (title && ls.length === 1) ls[0].t = title; }
+    else {
+      const lines = text.split(/\n+/).map(x => x.trim()).filter(Boolean); if (title) lines.unshift(title);
+      ls = [makeLesson([lines], 'text', 1, 1)];
+      if (title) ls[0].t = title; else if (ls[0].t === 'Materi 1') ls[0].t = 'Materi ' + (c.ls.length + 1);
+    }
+    if (!ls.length) throw new Error('empty');
+  } catch (e) { btn.disabled = false; btn.textContent = 'Tambahkan'; return failRead(e); }
+  const pool = makePool(ls.flatMap(l => l._p).concat(c.ls.flatMap(lessonParas)));
+  ls.forEach(l => { l.q = qn ? genQuestions(l._p, pool, qn) : []; delete l._p; });
+  c.ls.push(...ls); save(); closeModal(); toast(`${ls.length} materi ditambahkan · ${ls.reduce((a, l) => a + l.q.length, 0)} soal`); vKelas();
+}
+function delLesson(cid, lid) {
+  confirmModal('Materi ini akan dihapus dari kelas.', () => {
+    const c = S.courses.find(x => x.id === cid); if (!c) return;
+    c.ls = c.ls.filter(l => l.id !== lid); delete S.done[lid]; delete S.scores[lid]; save(); go('kelas', { s: cid });
+  });
+}
+function delCourse(cid) {
+  confirmModal('Kelas beserta semua materi dan tryout-nya akan dihapus.', () => {
+    const c = S.courses.find(x => x.id === cid); if (!c) return;
+    c.ls.forEach(l => { delete S.done[l.id]; delete S.scores[l.id]; });
+    S.quizzes.filter(q => q.cid === cid).forEach(q => delete S.scores['u-' + q.id]);
+    delete S.scores['try-' + cid];
+    S.quizzes = S.quizzes.filter(q => q.cid !== cid); S.courses = S.courses.filter(x => x.id !== cid);
+    if (S.last && c.ls.some(l => l.id === S.last.id)) S.last = null;
+    save(); go('kelas');
+  });
+}
+
+/* ---- modal: tambah tryout ---- */
+function tryoutModal(cid) {
+  const c = ALLC().find(x => x.id === cid); if (!c) return;
+  const hasL = c.ls.some(l => lessonParas(l).length);
+  modal(`<h3>Tambah tryout</h3><p class="sub">Tryout untuk <b>${esc(c.name)}</b>. Soal bisa dibuat dari file PPT/PDF, dari materi kelas, atau ditulis sendiri.</p>
+  <div class="fld"><label>Nama tryout</label><input type="text" id="tName" maxlength="60" value="${esc('Tryout ' + c.name)}"></div>
+  <div class="fld"><label>Sumber soal</label><select id="tSrc" onchange="$('#tFileBox').style.display=this.value==='file'?'':'none';$('#tNBox').style.display=this.value==='manual'?'none':''"><option value="file">Dari file PPT / PDF</option>${hasL ? '<option value="lessons">Dari materi kelas ini</option>' : ''}<option value="manual">Tulis soal sendiri</option></select></div>
+  <div id="tFileBox" class="fld"><label class="drop">📄 Pilih file .pptx, .pdf, .txt, atau .md<input type="file" id="tFile" accept="${ACCEPT}" hidden></label><div class="note" id="tFn"></div></div>
+  <div id="tNBox" class="fld"><label>Jumlah soal</label><select id="tN"><option value="10">10 soal</option><option value="15" selected>15 soal</option><option value="20">20 soal</option><option value="30">30 soal</option></select></div>
+  <button class="btn" id="tGo" onclick="createTryout('${cid}')">Buat tryout</button>`);
+  $('#tFile').onchange = e => { const f = e.target.files[0]; $('#tFn').textContent = f ? '✔ ' + f.name : ''; };
+}
+async function createTryout(cid) {
+  const c = ALLC().find(x => x.id === cid); if (!c) return;
+  const mode = val('tSrc'), n = +val('tN') || 15, name = val('tName').trim() || 'Tryout ' + c.name; let qs = [];
+  const btn = $('#tGo'); btn.disabled = true; btn.textContent = 'Memproses…';
+  try {
+    if (mode === 'file') {
+      const f = fileOf('tFile'); if (!f) { btn.disabled = false; btn.textContent = 'Buat tryout'; return toast('Pilih file dulu.'); }
+      const ls = buildLessons(await readSource(f), 0); qs = genTryout(ls.map(l => l._p), makePool(ls.flatMap(l => l._p)), n);
+    } else if (mode === 'lessons') {
+      const parts = c.ls.map(lessonParas).filter(p => p.length); qs = genTryout(parts, makePool(parts.flat()), n);
+    }
+  } catch (e) { btn.disabled = false; btn.textContent = 'Buat tryout'; return failRead(e); }
+  const q = { id: uid(), name, qs, cid };
+  S.quizzes.push(q); save(); closeModal();
+  toast(mode === 'manual' ? 'Tryout dibuat. Tambahkan soalmu.' : qs.length ? `${qs.length} soal dibuat. Cek dulu, hapus yang kurang pas.` : 'Belum ada soal yang bisa dibuat otomatis dari sumber ini. Tambahkan soal manual.');
+  go('kuis', { q: q.id });
+}
+
+/* ---- tambah soal otomatis ke kuis/tryout yang sudah ada ---- */
+function genModal(qid) {
+  modal(`<h3>Soal dari file</h3><p class="sub">Soal baru dibuat otomatis dari isi file, lalu ditambahkan ke kuis ini.</p>
+  <div class="fld"><label class="drop">📄 Pilih file .pptx, .pdf, .txt, atau .md<input type="file" id="gFile" accept="${ACCEPT}" hidden></label><div class="note" id="gFn"></div></div>
+  <div class="fld"><label>Jumlah soal</label><select id="gN"><option value="5">5 soal</option><option value="10" selected>10 soal</option><option value="15">15 soal</option><option value="20">20 soal</option></select></div>
+  <button class="btn" id="gGo" onclick="genInto('${qid}')">Buat soal</button>`);
+  $('#gFile').onchange = e => { const f = e.target.files[0]; $('#gFn').textContent = f ? '✔ ' + f.name : ''; };
+}
+async function genInto(qid) {
+  const q = S.quizzes.find(x => x.id === qid), f = fileOf('gFile'); if (!q) return; if (!f) return toast('Pilih file dulu.');
+  const btn = $('#gGo'); btn.disabled = true; btn.textContent = 'Memproses…';
+  try {
+    const ls = buildLessons(await readSource(f), 0), got = genTryout(ls.map(l => l._p), makePool(ls.flatMap(l => l._p)), +val('gN'));
+    const have = new Set(q.qs.map(x => x.q)); const add = got.filter(x => !have.has(x.q)); q.qs.push(...add); save(); closeModal();
+    toast(add.length ? `${add.length} soal ditambahkan` : 'Belum ada soal yang bisa dibuat dari file ini.'); vKuis();
+  } catch (e) { btn.disabled = false; btn.textContent = 'Buat soal'; failRead(e); }
+}
+
 
 /* ================= Runner kuis ================= */
 let run = null;
@@ -819,16 +1146,17 @@ function vKuis() {
   if (param && param.q) { const q = S.quizzes.find(x => x.id === param.q); if (q) return vQuizManage(q); }
   $('#view').innerHTML = `<div class="row"><h2 style="margin:0">🧠 Kuis</h2><div class="grow"></div><button class="btn" onclick="quizModal()">＋ Kuis baru</button></div><p class="sub">Susun soal pilihan ganda sendiri, atau coba mini tryout dari Kelas.</p>
   <div class="sect" style="margin-top:6px"><h3>Kuis buatanku</h3></div>
-  ${S.quizzes.length ? S.quizzes.map(q => `<div class="item"><div class="ico">📋</div><div class="grow"><b>${esc(q.name)}</b><br><small>${q.qs.length} soal${S.scores['u-' + q.id] != null ? ' · skor terbaik ' + S.scores['u-' + q.id] + '%' : ''}</small></div><button class="btn sm" ${q.qs.length ? '' : 'disabled'} onclick="playQuiz('${q.id}')">Mulai</button><button class="btn ghost sm" onclick="go('kuis',{q:'${q.id}'})">Kelola</button></div>`).join('') : '<div class="empty"><div class="em">📋</div>Belum ada kuis buatanmu.<br><br><button class="btn" onclick="quizModal()">Buat kuis pertama</button></div>'}
+  ${S.quizzes.length ? S.quizzes.map(q => `<div class="item"><div class="ico">📋</div><div class="grow"><b>${esc(q.name)}</b><br><small>${q.cid ? '🎓 ' + esc(courseName(q.cid)) + ' · ' : ''}${q.qs.length} soal${S.scores['u-' + q.id] != null ? ' · skor terbaik ' + S.scores['u-' + q.id] + '%' : ''}</small></div><button class="btn sm" ${q.qs.length ? '' : 'disabled'} onclick="playQuiz('${q.id}')">Mulai</button><button class="btn ghost sm" onclick="go('kuis',{q:'${q.id}'})">Kelola</button></div>`).join('') : '<div class="empty"><div class="em">📋</div>Belum ada kuis buatanmu.<br><br><button class="btn" onclick="quizModal()">Buat kuis pertama</button></div>'}
   <div class="sect"><h3>Dari Kelas</h3></div>
-  <div class="grid g3">${COURSES.map(c => `<div class="card hover" onclick="tryout('${c.id}')"><div style="font-size:26px">${c.emoji}</div><b>${c.name}</b><div class="note">${c.ls.length * 3} soal${S.scores['try-' + c.id] != null ? ' · terbaik ' + S.scores['try-' + c.id] + '%' : ''}</div></div>`).join('')}</div>`;
+  <div class="grid g3">${ALLC().map(c => `<div class="card hover" onclick="tryout('${c.id}')"><div style="font-size:26px">${c.emoji}</div><b>${c.name}</b><div class="note">${qCount(c)} soal${S.scores['try-' + c.id] != null ? ' · terbaik ' + S.scores['try-' + c.id] + '%' : ''}</div></div>`).join('')}</div>`;
 }
 function quizModal() { modal(`<h3>Kuis baru</h3><div class="fld"><label>Nama kuis</label><input type="text" id="qzName" placeholder="Mis. Kuis Sejarah Bab 3" maxlength="60"></div><button class="btn" onclick="addQuiz()">Buat kuis</button>`); setTimeout(() => { const i = $('#qzName'); if (i) i.focus(); }, 100); }
 function addQuiz() { const n = val('qzName').trim(); if (!n) return toast('Isi nama kuis.'); const q = { id: uid(), name: n, qs: [] }; S.quizzes.push(q); save(); closeModal(); go('kuis', { q: q.id }); }
-function playQuiz(id) { const q = S.quizzes.find(x => x.id === id); startRun(q.name, q.qs, 'u-' + id, () => go('kuis')); }
+function playQuiz(id) { const q = S.quizzes.find(x => x.id === id); startRun(q.name, q.qs, 'u-' + id, () => q.cid ? go('kelas', { s: q.cid }) : go('kuis')); }
+function quizCrumb(q) { return q.cid ? `<div class="crumb"><a onclick="go('kelas')">Kelas</a> › <a onclick="go('kelas',{s:'${q.cid}'})">${esc(courseName(q.cid))}</a> › ${esc(q.name)}</div>` : `<div class="crumb"><a onclick="go('kuis')">Kuis</a> › ${esc(q.name)}</div>`; }
 function vQuizManage(q) {
-  $('#view').innerHTML = `<div class="crumb"><a onclick="go('kuis')">Kuis</a> › ${esc(q.name)}</div><div class="row"><h2 style="margin:0">${esc(q.name)}</h2></div><p class="sub">${q.qs.length} soal</p>
-  <div class="row" style="margin-bottom:14px"><button class="btn" onclick="qModal('${q.id}')">＋ Tambah soal</button><button class="btn ghost" ${q.qs.length ? '' : 'disabled'} onclick="playQuiz('${q.id}')">▶ Mulai</button><button class="btn ghost" onclick="delQuiz('${q.id}')">🗑️ Hapus kuis</button></div>
+  $('#view').innerHTML = `${quizCrumb(q)}<div class="row"><h2 style="margin:0">${esc(q.name)}</h2></div><p class="sub">${q.qs.length} soal</p>
+  <div class="row" style="margin-bottom:14px"><button class="btn" onclick="qModal('${q.id}')">＋ Tambah soal</button><button class="btn ghost" ${q.qs.length ? '' : 'disabled'} onclick="playQuiz('${q.id}')">▶ Mulai</button><button class="btn ghost" onclick="genModal('${q.id}')">📄 Soal dari file</button><button class="btn ghost" onclick="delQuiz('${q.id}')">🗑️ Hapus kuis</button></div>
   ${q.qs.map((s, i) => `<div class="item"><div class="ico">${i + 1}</div><div class="grow"><b>${esc(s.q)}</b><br><small>✔ ${esc(s.o[s.a])}</small></div><button class="iconbtn" onclick="delQ('${q.id}',${i})">🗑️</button></div>`).join('') || '<div class="empty"><div class="em">✍️</div>Belum ada soal.</div>'}`;
 }
 function qModal(qid) {
@@ -844,7 +1172,7 @@ function saveQ(qid) {
   S.quizzes.find(x => x.id === qid).qs.push({ q, o: opts.map(o => o.t), a: ai, e: val('qe').trim() }); save(); closeModal(); toast('Soal ditambahkan'); vKuis();
 }
 function delQ(qid, i) { S.quizzes.find(x => x.id === qid).qs.splice(i, 1); save(); vKuis(); }
-function delQuiz(qid) { confirmModal('Kuis dan semua soalnya akan dihapus.', () => { S.quizzes = S.quizzes.filter(x => x.id !== qid); save(); go('kuis'); }); }
+function delQuiz(qid) { const cid = (S.quizzes.find(x => x.id === qid) || {}).cid; confirmModal('Kuis dan semua soalnya akan dihapus.', () => { S.quizzes = S.quizzes.filter(x => x.id !== qid); save(); cid ? go('kelas', { s: cid }) : go('kuis'); }); }
 
 /* ================= Game ================= */
 let gm = null, gmDeck = null;
